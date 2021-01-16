@@ -1,0 +1,7 @@
+main.c: In function ‘main’:
+main.c:32:10: warning: implicit declaration of function ‘SetColor’ [-Wimplicit-function-declaration]
+   32 |  pInfo = SetColor(pInfo, 0);
+      |          ^~~~~~~~
+main.c:32:8: warning: assignment to ‘imgInfo *’ from ‘int’ makes pointer from integer without a cast [-Wint-conversion]
+   32 |  pInfo = SetColor(pInfo, 0);
+      |        ^

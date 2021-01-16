@@ -27,5 +27,9 @@ int main(int argc, char* argv[]){
 	pInfo = MoveTo(pInfo, 5, 10);
 	//	printf("new width: %d, height: %d\n", &(pInfo->width), (pInfo+1));//one next address space
 	printf("new width: %d, height: %d\n", (pInfo->cX), pInfo->cY);//one next address space
+
+	printf("color: %d\n", pInfo->col);
+	pInfo = SetColor(pInfo, 0);
+	printf("new color: %d\n", pInfo->col);
 	return 0;
 }
