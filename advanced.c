@@ -280,15 +280,10 @@ int main(int argc, char* argv[])
 	MoveTo(pInfo, 256, 256);
 	printf("new width: %d, height: %d\n", (pInfo->cX), pInfo->cY);//one next address space
 
-	//	for (i=3; i < 10; i+=3){
-	i = 120;
-	SetColor(pInfo, i & 1);
-	printf("new Colour: %d\n", pInfo->col);
-	//	i = 0;
-	//	SetColor(pInfo, i & 1);
-	//	printf("new Colour: %d\n", pInfo->col);
-	DrawCircle(pInfo, i);
-	  //	}
+	for (i=3; i < 256; i+=3){
+	  SetColor(pInfo, i & 1);
+	  DrawCircle(pInfo, i);
+	}
 
 	saveBMP(pInfo, "result.bmp");
 	FreeScreen(pInfo);
