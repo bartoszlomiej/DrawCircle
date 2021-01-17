@@ -126,7 +126,9 @@ While:
 	mov ecx, DWORD[edi+16]	;cY
 
 	push edx
-	push esi 		;to preserve acros jmps
+	push esi 		;to preserve acros jmps --- might be used for all SetPixel calls!
+
+	;reasonable ---- pass the arguments in registers instead of pushing them on the stack
 	
 	mov edi, eax
 	sub edi, edx
@@ -136,14 +138,14 @@ While:
 	sub edi, esi
 	push edi
 
-	push DWORD[ebp+8]
+	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters!
 	call SetPixel
 
 	pop DWORD[ebp+8]
 	pop edi
-	pop edi			;-----------------?????????????????????????????????????????
+	pop edi			;just to clean the stack
 
-	pop esi
+	pop esi			;reading the x and y
 	pop edx
 
 	mov eax, DWORD[ebp-8]	;d
@@ -159,25 +161,25 @@ While:
 	mov DWORD[ebp-4], ecx
 	mov ecx, DWORD[ebp-12]	;dltB
 	add ecx, 8		;dltB += 2*4;
-	mov DWORD[ebp-8], ecx
+	mov DWORD[ebp-12], ecx
 	jmp Ending
 Else:
 	mov ecx, DWORD[ebp-12]	;dltB
 	add eax, ecx
 	mov DWORD[ebp-8], eax 	;d += dltB
-	dec esi
+;	dec esi
 	inc edx
 	mov eax, DWORD[ebp-4]
 	add eax, 8		;dltA += 2*4;
 	mov DWORD[ebp-4], eax
 	add ecx, 8		;dltB += 2*4;
-	mov DWORD[ebp-8], ecx
+	mov DWORD[ebp-12], ecx
 	
 Ending:
 	cmp edx, esi
 	jle While
 	mov eax, DWORD[ebp+8]
-	pop edi
+	pop edi			;just to clean the stack
 	pop edi
 	pop edi
 	pop ebp
