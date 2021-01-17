@@ -5,6 +5,7 @@ global SetColor
 global DrawCircle
 
 section .text
+	
 ;imgInfo* MoveTo(imgInfo* pImg, int x, int y)
 MoveTo:
 	;prologue
@@ -17,7 +18,7 @@ MoveTo:
 	;body
 	cmp esi, 0		;if (x >= 0 && x < pImg->width)
 	jl Epilogue
-	cmp esi, DWORD[edi]	;mr kozuszek code doesn't like this line
+	cmp esi, DWORD[edi]	
 	jge Epilogue
 
 	mov DWORD[edi+12], esi	;pInfo->cX = x
@@ -45,7 +46,7 @@ SetColor:
 	;body
 	cmp esi, 0
 	jne ChangeColor;move if not equal | edi = edi + 20 = pImg->col
-	mov DWORD[edi+20], 0	;Mr kozuszek code doesn't like this line as well:(
+	mov DWORD[edi+20], 0	
 	
 	;epilogue
 	mov eax, DWORD[ebp+8]
@@ -63,16 +64,15 @@ ChangeColor:
 ;	mov ebp, esp
 ;	call
 	
-	
+;imgInfo* DrawCircle(imgInfo* pImg, int radius){
 DrawCircle:
-	;imgInfo* DrawCircle(imgInfo* pImg, int radius){
 	;prologue
 	push ebp
-	mov ebp, esp
-	
+	mov ebp, esp	
 	mov edi, DWORD [ebp+8] 	;edi - is the address of *pImg
-	mov esi, DWORD [ebp+12] ; esi - is int radius -------------------------risky??????
-
+	mov esi, DWORD [ebp+12] ; esi - is int radius
+	
+	;body
 	xor edx, edx 		; int x = 0, int y = radius => y = esi
 
 	mov eax, esi
@@ -85,7 +85,7 @@ DrawCircle:
 
 	shl eax, 1
 	add eax, 5
-	push eax		;push d on stack on the address ebp-4
+	push eax		;push d on stack on the address ebp-8
 
 	mov eax, 12
 	push eax		;push dltB on stack on the address ebp-12
@@ -98,6 +98,7 @@ While:
 	push esi 		;to preserve acros jmps --- might be used for all SetPixel calls!
 
 	;reasonable ---- pass the arguments in registers instead of pushing them on the stack
+	;however, how to do this?
 	
 	mov edi, eax
 	sub edi, edx
@@ -107,7 +108,7 @@ While:
 	sub edi, esi
 	push edi
 
-	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters!
+	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters?
 	call SetPixel
 
 	pop DWORD[ebp+8]

@@ -3,8 +3,6 @@
 #include <memory.h>
 #include <math.h>
 
-//typedef struct imgInfo img;
-
 typedef struct{
 	int width, height;
 	unsigned char* pImg;
