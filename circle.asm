@@ -1,11 +1,18 @@
-;extern SetPixel
-
 global MoveTo
 global SetColor
 global DrawCircle
-global SetPixel
 
 section .text
+
+;It was decided to made the SetPixel a "private" function due to minimize the number of calls to the memory stack.
+;The major advantage of this solution over the prior solution is exactly 6 * 8 = 48 calls to the stack with
+;each iteration only in the DrawCircle function! Assuming that the number of calls in the SetPixel was greater then
+;it is now (as there were 3 parameters read, and there was saving of the *pPix, and pop of the ebp, hence it is
+;assumed that all numbers of calls to the stack had to be greater then 10), however, it might all depend on the
+;optimization level on the compiler, I might be wrong.
+
+;The previous solution can be seen in the commits on my github account:
+;https://github.com/bartoszlomiej/DrawCircle	
 	
 ;imgInfo* MoveTo(imgInfo* pImg, int x, int y)
 MoveTo:
@@ -59,24 +66,22 @@ ChangeColor:
 	mov eax, DWORD[ebp+8]
 	pop ebp			;return pImg
 	ret
-
+	
+;void SetPixel(imgInfo* pImg, int x, int y){
 SetPixel:
-	;prologue	
-	push ebp
-	mov ebp, esp
+	mov edi, DWORD[ebp+8]
+	;edi is imgInfo*pImg
+	;esi is int x
+	;edx is int y
 
-	mov edi, DWORD [ebp+8]	;imgInfo* pImg
-	mov esi, DWORD [ebp+12]	;int x
-	mov edx, DWORD [ebp+16]	;int y
-	;body
 	;if (x < 0 || x >= pImg->width || y < 0 || y >= pImg->height)
-	cmp esi, 0
-	jl ReturnVoid
-	cmp esi, DWORD[edi]	;cmp x, pImg->width
-	jge ReturnVoid
 	cmp edx, 0
 	jl ReturnVoid
-	cmp edx, DWORD[edi+4]	;cmp y, pImg->height
+	cmp edx, DWORD[edi]	;cmp x, pImg->width
+	jge ReturnVoid
+	cmp esi, 0
+	jl ReturnVoid
+	cmp esi, DWORD[edi+4]	;cmp y, pImg->height
 	jge ReturnVoid
 
 	;unsigned char *pPix = pImg->pImg + (((pImg->width + 31) >> 5) << 2) * y + (x >> 3);
@@ -84,18 +89,20 @@ SetPixel:
 	add eax, 31
 	shr eax, 5
 	shl eax, 2
-	imul eax, edx		;multiplication
-	mov ecx, esi		;so as to perform x >> 3
+	imul eax, esi		
+	mov ecx, edx		;so as to perform x >> 3
 	shr ecx, 3
 	add eax, ecx
 	add eax, DWORD[edi+8]
 
 	;unsigned char mask = 0x80 >> (x & 0x07);
-	mov ecx, esi
-	mov esi, 0x80
+	mov ecx, edx
+	mov edi, 0x80
 	and ecx, 0x07
-	shr esi, cl
-	mov ecx, esi		;just for dbg
+	shr edi, cl		;shr needs either imidiate or cl register, which is actually a part of ecx
+	mov ecx, edi		;just for the comfortable usage
+	
+	mov edi, DWORD[ebp+8]
 
 	cmp DWORD[edi+20], 1
 	jne BlackPixel
@@ -110,21 +117,7 @@ BlackPixel:
 
 ReturnVoid:
 	xor eax, eax		;return void - in this case return 0 
-	pop ebp
 	ret
-
-;void SetPixel(imgInfo* pImg, int x, int y){
-;	unsigned char *pPix = pImg->pImg + (((pImg->width + 31) >> 5) << 2) * y + (x >> 3);
-;	unsigned char mask = 0x80 >> (x & 0x07);
-;
-;	if (x < 0 || x >= pImg->width || y < 0 || y >= pImg->height)
-;		return;
-;
-;	if (pImg->col)
-;		*pPix |= mask;
-;	else
-;		*pPix &= ~mask;
-;	}
 	
 ;imgInfo* DrawCircle(imgInfo* pImg, int radius){
 DrawCircle:
@@ -159,177 +152,150 @@ While:
 	push edx
 	push esi 		;to preserve acros jmps --- might be used for all SetPixel calls!
 
-	;reasonable ---- pass the arguments in registers instead of pushing them on the stack
-	;however, how to do this?
-	
 	mov edi, eax
-	sub edi, edx
-	push edi
+	sub edi, edx 		;should be passed eax
+	mov edx, edi
 
 	mov edi, ecx
-	sub edi, esi
-	push edi
+	sub edi, esi		;should be passed ecx
+	mov esi, edi
 
-	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters?
+	;esi is passed y; edx is passed x
 	call SetPixel
-
-	pop DWORD[ebp+8]
-	pop edi
-	pop edi			;just to clean the stack
-	;------------------------------------------
+	;--------------------------------
 	mov edi, DWORD[ebp+8]
-	mov eax, DWORD[edi+12]
-	mov ecx, DWORD[edi+16]
-	
+	mov eax, DWORD[edi+12]	;cX
+	mov ecx, DWORD[edi+16]	;cY
+
 	mov edx, DWORD[ebp-20]
-	mov edi, eax
-	sub edi, edx
-	push edi
-
 	mov esi, DWORD[ebp-16]
-	mov edi, ecx
-	sub edi, esi
-	push edi
 
-	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters!
-	call SetPixel
-
-	pop DWORD[ebp+8]
-	pop edi
-	pop edi			;just to clean the stack
-	;------------------------------------------
-	;------------------------------------------
-	mov edi, DWORD[ebp+8]
-	mov eax, DWORD[edi+12]
-	mov ecx, DWORD[edi+16]
-	
-	mov edx, DWORD[ebp-20]
 	mov edi, eax
-	add edi, edx
-	push edi
+	sub edi, edx 		
+	mov edx, edi
 
-	mov esi, DWORD[ebp-16]
 	mov edi, ecx
-	add edi, esi
-	push edi
+	sub edi, esi		
+	mov esi, edi
 
-	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters!
+	;esi is passed y; edx is passed x
 	call SetPixel
-
-	pop DWORD[ebp+8]
-	pop edi
-	pop edi			;just to clean the stack
-	;------------------------------------------
-	;------------------------------------------
+	;--------------------------------
+	;--------------------------------
 	mov edi, DWORD[ebp+8]
-	mov eax, DWORD[edi+12]
-	mov ecx, DWORD[edi+16]
-	
+	mov eax, DWORD[edi+12]	;cX
+	mov ecx, DWORD[edi+16]	;cY
+
 	mov edx, DWORD[ebp-16]
-	mov edi, eax
-	add edi, edx
-	push edi
-
 	mov esi, DWORD[ebp-20]
-	mov edi, ecx
-	add edi, esi
-	push edi
 
-	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters!
-	call SetPixel
-
-	pop DWORD[ebp+8]
-	pop edi
-	pop edi			;just to clean the stack
-	;------------------------------------------
-	;------------------------------------------
-	mov edi, DWORD[ebp+8]
-	mov eax, DWORD[edi+12]
-	mov ecx, DWORD[edi+16]
-	
-	mov edx, DWORD[ebp-16]
 	mov edi, eax
-	add edi, edx
-	push edi
+	add edi, edx 		
+	mov edx, edi
 
-	mov esi, DWORD[ebp-20]
 	mov edi, ecx
-	sub edi, esi
-	push edi
+	sub edi, esi		
+	mov esi, edi
 
-	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters!
+	;esi is passed y; edx is passed x
 	call SetPixel
-
-	pop DWORD[ebp+8]
-	pop edi
-	pop edi			;just to clean the stack
-	;------------------------------------------
-	;------------------------------------------
+	;--------------------------------
+	;--------------------------------
 	mov edi, DWORD[ebp+8]
-	mov eax, DWORD[edi+12]
-	mov ecx, DWORD[edi+16]
-	
+	mov eax, DWORD[edi+12]	;cX
+	mov ecx, DWORD[edi+16]	;cY
+
 	mov edx, DWORD[ebp-20]
-	mov edi, eax
-	add edi, edx
-	push edi
-
 	mov esi, DWORD[ebp-16]
-	mov edi, ecx
-	sub edi, esi
-	push edi
 
-	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters!
-	call SetPixel
-
-	pop DWORD[ebp+8]
-	pop edi
-	pop edi			;just to clean the stack
-	;------------------------------------------		
-	;------------------------------------------
-	mov edi, DWORD[ebp+8]
-	mov eax, DWORD[edi+12]
-	mov ecx, DWORD[edi+16]
-	
-	mov edx, DWORD[ebp-20]
 	mov edi, eax
-	sub edi, edx
-	push edi
+	add edi, edx 		
+	mov edx, edi
 
-	mov esi, DWORD[ebp-16]
 	mov edi, ecx
-	add edi, esi
-	push edi
+	sub edi, esi		
+	mov esi, edi
 
-	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters!
+	;esi is passed y; edx is passed x
 	call SetPixel
-
-	pop DWORD[ebp+8]
-	pop edi
-	pop edi			;just to clean the stack
-	;------------------------------------------
-	;------------------------------------------
+	;--------------------------------
+	;--------------------------------
 	mov edi, DWORD[ebp+8]
-	mov eax, DWORD[edi+12]
-	mov ecx, DWORD[edi+16]
-	
+	mov eax, DWORD[edi+12]	;cX
+	mov ecx, DWORD[edi+16]	;cY
+
 	mov edx, DWORD[ebp-16]
-	mov edi, eax
-	sub edi, edx
-	push edi
-
 	mov esi, DWORD[ebp-20]
+
+	mov edi, eax
+	sub edi, edx 		
+	mov edx, edi
+
 	mov edi, ecx
-	add edi, esi
-	push edi
+	add edi, esi		
+	mov esi, edi
 
-	push DWORD[ebp+8]	;edi, esi, edx -- can be used to pass parameters!
+	;esi is passed y; edx is passed x
 	call SetPixel
+	;--------------------------------
+	;--------------------------------
+	mov edi, DWORD[ebp+8]
+	mov eax, DWORD[edi+12]	;cX
+	mov ecx, DWORD[edi+16]	;cY
 
-	pop DWORD[ebp+8]
-	pop edi
-	pop edi			;just to clean the stack
-	;------------------------------------------
+	mov edx, DWORD[ebp-20]
+	mov esi, DWORD[ebp-16]
+
+	mov edi, eax
+	sub edi, edx 		
+	mov edx, edi
+
+	mov edi, ecx
+	add edi, esi		
+	mov esi, edi
+
+	;esi is passed y; edx is passed x
+	call SetPixel
+	;--------------------------------
+	;--------------------------------
+	mov edi, DWORD[ebp+8]
+	mov eax, DWORD[edi+12]	;cX
+	mov ecx, DWORD[edi+16]	;cY
+
+	mov edx, DWORD[ebp-16]
+	mov esi, DWORD[ebp-20]
+
+	mov edi, eax
+	add edi, edx 		
+	mov edx, edi
+
+	mov edi, ecx
+	add edi, esi		
+	mov esi, edi
+
+	;esi is passed y; edx is passed x
+	call SetPixel
+	;--------------------------------
+	;--------------------------------
+	mov edi, DWORD[ebp+8]
+	mov eax, DWORD[edi+12]	;cX
+	mov ecx, DWORD[edi+16]	;cY
+
+	mov edx, DWORD[ebp-20]
+	mov esi, DWORD[ebp-16]
+
+	mov edi, eax
+	add edi, edx 		
+	mov edx, edi
+
+	mov edi, ecx
+	add edi, esi		
+	mov esi, edi
+
+	;esi is passed y; edx is passed x
+	call SetPixel
+	;--------------------------------
+	
 	pop esi			;reading the x and y
 	pop edx
 
@@ -348,11 +314,11 @@ While:
 	add ecx, 8		;dltB += 2*4;
 	mov DWORD[ebp-12], ecx
 	jmp Ending
+
 Else:
 	mov ecx, DWORD[ebp-12]	;dltB
 	add eax, ecx
 	mov DWORD[ebp-8], eax 	;d += dltB
-;	dec esi
 	inc edx
 	mov eax, DWORD[ebp-4]
 	add eax, 8		;dltA += 2*4;
@@ -369,32 +335,3 @@ Ending:
 	pop edi
 	pop ebp
 	ret
-;	while (x <= y)
-;	{
-;		// 8 symmetric pixels
-;		SetPixel(pImg, cx-x, cy-y);
-;		SetPixel(pImg, cx-x, cy+y);
-;		SetPixel(pImg, cx+x, cy-y);
-;		SetPixel(pImg, cx+x, cy+y);
-;		SetPixel(pImg, cx-y, cy-x);
-;		SetPixel(pImg, cx-y, cy+x);
-;		SetPixel(pImg, cx+y, cy-x);
-;		SetPixel(pImg, cx+y, cy+x);
-;		if (d > 0)
-;		{
-;			d += dltA;
-;			y--;
-;			x++;
-;			dltA += 4*4;
-;			dltB += 2*4;
-;		}
-;		else
-;		{
-;			d += dltB;
-;			x++;
-;			dltA += 2*4;
-;			dltB += 2*4;
-;		}
-;	}
-;	return pImg;
-;}				
