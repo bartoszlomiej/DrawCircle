@@ -192,6 +192,7 @@ imgInfo* MoveTo(imgInfo* pImg, int x, int y)
 	return pImg;
 }
 */
+/*
 void SetPixel(imgInfo* pImg, int x, int y)
 {
 	unsigned char *pPix = pImg->pImg + (((pImg->width + 31) >> 5) << 2) * y + (x >> 3);
@@ -205,6 +206,7 @@ void SetPixel(imgInfo* pImg, int x, int y)
 	else
 		*pPix &= ~mask;
 }
+*/
 /*
 imgInfo* DrawCircle(imgInfo* pImg, int radius)
 {

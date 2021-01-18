@@ -1,8 +1,9 @@
-extern SetPixel
+;extern SetPixel
 
 global MoveTo
 global SetColor
 global DrawCircle
+global SetPixel
 
 section .text
 	
@@ -59,10 +60,71 @@ ChangeColor:
 	pop ebp			;return pImg
 	ret
 
-;SetPixel:
-;	push ebp
-;	mov ebp, esp
-;	call
+SetPixel:
+	;prologue	
+	push ebp
+	mov ebp, esp
+
+	mov edi, DWORD [ebp+8]	;imgInfo* pImg
+	mov esi, DWORD [ebp+12]	;int x
+	mov edx, DWORD [ebp+16]	;int y
+	;body
+	;if (x < 0 || x >= pImg->width || y < 0 || y >= pImg->height)
+	cmp esi, 0
+	jl ReturnVoid
+	cmp esi, DWORD[edi]	;cmp x, pImg->width
+	jge ReturnVoid
+	cmp edx, 0
+	jl ReturnVoid
+	cmp edx, DWORD[edi+4]	;cmp y, pImg->height
+	jge ReturnVoid
+
+	;unsigned char *pPix = pImg->pImg + (((pImg->width + 31) >> 5) << 2) * y + (x >> 3);
+	mov eax, DWORD[edi]
+	add eax, 31
+	shr eax, 5
+	shl eax, 2
+	imul eax, edx		;multiplication
+	mov ecx, esi		;so as to perform x >> 3
+	shr ecx, 3
+	add eax, ecx
+	add eax, DWORD[edi+8]
+
+	;unsigned char mask = 0x80 >> (x & 0x07);
+	mov ecx, esi
+	mov esi, 0x80
+	and ecx, 0x07
+	shr esi, cl
+	mov ecx, esi		;just for dbg
+
+	cmp DWORD[edi+20], 1
+	jne BlackPixel
+	or ecx, DWORD[eax]	;*pPix |= mask;
+	mov DWORD[eax], ecx
+	jmp ReturnVoid
+	
+BlackPixel:
+	not ecx			;*pPix &= ~mask;
+	and ecx, DWORD[eax]
+	mov DWORD[eax], ecx
+
+ReturnVoid:
+	xor eax, eax		;return void - in this case return 0 
+	pop ebp
+	ret
+
+;void SetPixel(imgInfo* pImg, int x, int y){
+;	unsigned char *pPix = pImg->pImg + (((pImg->width + 31) >> 5) << 2) * y + (x >> 3);
+;	unsigned char mask = 0x80 >> (x & 0x07);
+;
+;	if (x < 0 || x >= pImg->width || y < 0 || y >= pImg->height)
+;		return;
+;
+;	if (pImg->col)
+;		*pPix |= mask;
+;	else
+;		*pPix &= ~mask;
+;	}
 	
 ;imgInfo* DrawCircle(imgInfo* pImg, int radius){
 DrawCircle:
