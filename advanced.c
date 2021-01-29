@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -14,27 +15,29 @@ extern imgInfo *MoveTo(imgInfo* pInfo, int x, int y);
 extern imgInfo *SetColor(imgInfo* pInfo, int col);
 extern imgInfo *DrawCircle(imgInfo* pInfo, int radius);
 
+#pragma pack(push, 1)
 typedef struct
 {
-	unsigned short bfType; 
-	unsigned long  bfSize; 
-	unsigned short bfReserved1; 
-	unsigned short bfReserved2; 
-	unsigned long  bfOffBits; 
-	unsigned long  biSize; 
-	long  biWidth; 
-	long  biHeight; 
-	short biPlanes; 
-	short biBitCount; 
-	unsigned long  biCompression; 
-	unsigned long  biSizeImage; 
-	long biXPelsPerMeter; 
-	long biYPelsPerMeter; 
-	unsigned long  biClrUsed; 
-	unsigned long  biClrImportant;
-	unsigned long  RGBQuad_0;
-	unsigned long  RGBQuad_1;
+  uint16_t bfType;
+  uint32_t  bfSize; 
+  uint16_t bfReserved1; 
+  uint16_t bfReserved2; 
+  uint32_t  bfOffBits; 
+  uint32_t  biSize; 
+  int32_t  biWidth; 
+  int32_t  biHeight; 
+  int16_t biPlanes; 
+  int16_t biBitCount; 
+  uint32_t  biCompression; 
+  uint32_t  biSizeImage; 
+  int32_t biXPelsPerMeter; 
+  int32_t biYPelsPerMeter; 
+  uint32_t  biClrUsed; 
+  uint32_t  biClrImportant;
+  uint32_t  RGBQuad_0;
+  uint32_t  RGBQuad_1;
 } bmpHdr;
+#pragma pack(pop)
 
 void* freeResources(FILE* pFile, void* pFirst, void* pSnd)
 {
@@ -148,6 +151,59 @@ int saveBMP(const imgInfo* pInfo, const char* fname)
 	return 0;
 }
 
+void SetPixel(imgInfo* pImg, int x, int y)
+{
+	unsigned char *pPix = pImg->pImg + (((pImg->width + 31) >> 5) << 2) * y + (x >> 3);
+	unsigned char mask = 0x80 >> (x & 0x07);
+
+	if (x < 0 || x >= pImg->width || y < 0 || y >= pImg->height)
+		return;
+
+	if (pImg->col)
+		*pPix |= mask;
+	else
+		*pPix &= ~mask;
+}
+
+/*
+imgInfo* DrawCircle(imgInfo* pImg, int radius)
+{
+	// draws circle with center in currnet position and given radius
+	int cx = pImg->cX, cy = pImg->cY;
+	int d = 5 - 4 * radius, x = 0, y = radius;
+	int dltA = (-2*radius+5)*4;
+	int dltB = 3*4;
+
+	while (x <= y)
+	{
+		// 8 symmetric pixels
+		SetPixel(pImg, cx-x, cy-y);
+		SetPixel(pImg, cx-x, cy+y);
+		SetPixel(pImg, cx+x, cy-y);
+		SetPixel(pImg, cx+x, cy+y);
+		SetPixel(pImg, cx-y, cy-x);
+		SetPixel(pImg, cx-y, cy+x);
+		SetPixel(pImg, cx+y, cy-x);
+		SetPixel(pImg, cx+y, cy+x);
+		if (d > 0)
+		{
+			d += dltA;
+			y--;
+			x++;
+			dltA += 4*4;
+			dltB += 2*4;
+		}
+		else
+		{
+			d += dltB;
+			x++;
+			dltA += 2*4;
+			dltB += 2*4;
+		}
+	}
+	return pImg;
+}
+*/
 /****************************************************************************************/
 imgInfo* InitScreen (int w, int h)
 {
@@ -183,7 +239,6 @@ int main(int argc, char* argv[])
 {
 	imgInfo* pInfo;
 	int i, j;
-
 	if (sizeof(bmpHdr) != 62)
 	{
 		printf("Change compilation options so as bmpHdr struct size is 62 bytes.\n");
@@ -207,6 +262,9 @@ int main(int argc, char* argv[])
 
 	pInfo = readBMP("blank.bmp");
 	MoveTo(pInfo, 256, 256);
+	int a = 10;
+	printf("int: %d\n struct: %d\n", sizeof(a), sizeof(pInfo));
+	printf("Moved to: %d, %d", pInfo->cX, pInfo->cY);
 
 	for (i=3; i < 256; i+=3){
 	  SetColor(pInfo, i & 1);

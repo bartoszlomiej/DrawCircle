@@ -4,6 +4,8 @@ global DrawCircle
 
 section .text
 
+	
+
 ;It was decided to made the SetPixel a "private" function due to minimize the number of calls to the memory stack.
 ;The major advantage of this solution over the prior solution is exactly 6 * 8 = 48 calls to the stack less with
 ;each iteration only in the DrawCircle function! Assuming that the number of calls in the SetPixel was greater then
@@ -75,7 +77,7 @@ SetPixel:
 	;edx is int y
 
 	;if (x < 0 || x >= pImg->width || y < 0 || y >= pImg->height)
-	cmp edx, 0		;cpm edx, 0
+	cmp edx, 0
 	jl ReturnVoid
 	cmp edx, DWORD[edi]	;cmp x, pImg->width
 	jge ReturnVoid

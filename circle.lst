@@ -1,0 +1,337 @@
+     1                                  global MoveTo
+     2                                  global SetColor
+     3                                  global DrawCircle
+     4                                  
+     5                                  section .text
+     6                                  
+     7                                  ;It was decided to made the SetPixel a "private" function due to minimize the number of calls to the memory stack.
+     8                                  ;The major advantage of this solution over the prior solution is exactly 6 * 8 = 48 calls to the stack less with
+     9                                  ;each iteration only in the DrawCircle function! Assuming that the number of calls in the SetPixel was greater then
+    10                                  ;it is now (as there were 3 parameters read, and there was saving of the *pPix, and pop of the ebp, hence it is
+    11                                  ;assumed that all numbers of calls to the stack had to be greater then 10), however, it might all depend on the
+    12                                  ;optimization level on the compiler, I might be wrong.
+    13                                  
+    14                                  ;The previous solution can be seen in the commits on my github account:
+    15                                  ;https://github.com/bartoszlomiej/DrawCircle	
+    16                                  	
+    17                                  ;imgInfo* MoveTo(imgInfo* pImg, int x, int y)
+    18                                  MoveTo:
+    19                                  	;prologue
+    20 00000000 55                      	push ebp
+    21 00000001 89E5                    	mov ebp, esp
+    22 00000003 8B7D08                  	mov edi, DWORD [ebp+8]	;edi - is the address of *pImg
+    23 00000006 8B750C                  	mov esi, DWORD [ebp+12]	;esi - is int x
+    24 00000009 8B5510                  	mov edx, DWORD [ebp+16]	;edx - is int y
+    25                                  	
+    26                                  	;body
+    27 0000000C 83FE00                  	cmp esi, 0		;if (x >= 0 && x < pImg->width)
+    28 0000000F 7C14                    	jl Epilogue
+    29 00000011 3B37                    	cmp esi, DWORD[edi]	
+    30 00000013 7D10                    	jge Epilogue
+    31                                  
+    32 00000015 89770C                  	mov DWORD[edi+12], esi	;pInfo->cX = x
+    33                                  CheckY:
+    34 00000018 83FA00                  	cmp edx, 0		;if (y >= 0 && y < pImg->height)
+    35 0000001B 7C08                    	jl Epilogue
+    36 0000001D 3B5704                  	cmp edx, DWORD[edi+4]
+    37 00000020 7D03                    	jge Epilogue
+    38                                  
+    39 00000022 895710                  	mov DWORD[edi+16], edx	;pInfo->cY = y
+    40                                  Epilogue:
+    41                                  	;epilogue
+    42 00000025 8B4508                  	mov eax, DWORD[ebp+8] 	;return pImg
+    43 00000028 5D                      	pop ebp
+    44 00000029 C3                      	ret
+    45                                  
+    46                                  ;imgInfo* SetColor(imgInfo* pImg, int col){
+    47                                  SetColor:
+    48                                  	;prologue
+    49 0000002A 55                      	push ebp
+    50 0000002B 89E5                    	mov ebp, esp
+    51 0000002D 8B7D08                  	mov edi, DWORD[ebp+8]	;edi is the address of *pImg
+    52 00000030 8B750C                  	mov esi, DWORD[ebp+12] 	;esi - is int col
+    53                                  	
+    54                                  	;body
+    55 00000033 83FE00                  	cmp esi, 0
+    56 00000036 750C                    	jne ChangeColor;move if not equal | edi = edi + 20 = pImg->col
+    57 00000038 C7471400000000          	mov DWORD[edi+20], 0	
+    58                                  	
+    59                                  	;epilogue
+    60 0000003F 8B4508                  	mov eax, DWORD[ebp+8]
+    61 00000042 5D                      	pop ebp			;return pImg
+    62 00000043 C3                      	ret
+    63                                  ChangeColor:
+    64 00000044 C7471401000000          	mov DWORD[edi+20], 1
+    65                                  	;epilogue
+    66 0000004B 8B4508                  	mov eax, DWORD[ebp+8]
+    67 0000004E 5D                      	pop ebp			;return pImg
+    68 0000004F C3                      	ret
+    69                                  	
+    70                                  ;void SetPixel(imgInfo* pImg, int x, int y){
+    71                                  SetPixel:
+    72 00000050 8B7D08                  	mov edi, DWORD[ebp+8]
+    73                                  	;edi is imgInfo*pImg
+    74                                  	;esi is int x
+    75                                  	;edx is int y
+    76                                  
+    77                                  	;if (x < 0 || x >= pImg->width || y < 0 || y >= pImg->height)
+    78 00000053 83FA00                  	cmp edx, 0		;cpm edx, 0
+    79 00000056 7C49                    	jl ReturnVoid
+    80 00000058 3B17                    	cmp edx, DWORD[edi]	;cmp x, pImg->width
+    81 0000005A 7D45                    	jge ReturnVoid
+    82 0000005C 83FE00                  	cmp esi, 0
+    83 0000005F 7C40                    	jl ReturnVoid
+    84 00000061 3B7704                  	cmp esi, DWORD[edi+4]	;cmp y, pImg->height
+    85 00000064 7D3B                    	jge ReturnVoid
+    86                                  
+    87                                  	;unsigned char *pPix = pImg->pImg + (((pImg->width + 31) >> 5) << 2) * y + (x >> 3);
+    88 00000066 8B07                    	mov eax, DWORD[edi]
+    89 00000068 83C01F                  	add eax, 31
+    90 0000006B C1E805                  	shr eax, 5
+    91 0000006E C1E002                  	shl eax, 2
+    92 00000071 0FAFC6                  	imul eax, esi		
+    93 00000074 89D1                    	mov ecx, edx		;so as to perform x >> 3
+    94 00000076 C1E903                  	shr ecx, 3
+    95 00000079 01C8                    	add eax, ecx
+    96 0000007B 034708                  	add eax, DWORD[edi+8]
+    97                                  
+    98                                  	;unsigned char mask = 0x80 >> (x & 0x07);
+    99 0000007E 89D1                    	mov ecx, edx
+   100 00000080 BF80000000              	mov edi, 0x80
+   101 00000085 83E107                  	and ecx, 0x07
+   102 00000088 D3EF                    	shr edi, cl		;shr needs either imidiate or cl register, which is actually a part of ecx
+   103 0000008A 89F9                    	mov ecx, edi		;just for the comfortable usage
+   104                                  	
+   105 0000008C 8B7D08                  	mov edi, DWORD[ebp+8]
+   106                                  
+   107 0000008F 837F1401                	cmp DWORD[edi+20], 1
+   108 00000093 7506                    	jne BlackPixel
+   109 00000095 0B08                    	or ecx, DWORD[eax]	;*pPix |= mask;
+   110 00000097 8908                    	mov DWORD[eax], ecx
+   111 00000099 EB06                    	jmp ReturnVoid
+   112                                  	
+   113                                  BlackPixel:
+   114 0000009B F7D1                    	not ecx			;*pPix &= ~mask;
+   115 0000009D 2308                    	and ecx, DWORD[eax]
+   116 0000009F 8908                    	mov DWORD[eax], ecx
+   117                                  
+   118                                  ReturnVoid:
+   119 000000A1 31C0                    	xor eax, eax		;return void - in this case return 0 
+   120 000000A3 C3                      	ret
+   121                                  	
+   122                                  ;imgInfo* DrawCircle(imgInfo* pImg, int radius){
+   123                                  DrawCircle:
+   124                                  	;prologue
+   125 000000A4 55                      	push ebp
+   126 000000A5 89E5                    	mov ebp, esp	
+   127 000000A7 8B7D08                  	mov edi, DWORD [ebp+8] 	;edi - is the address of *pImg
+   128 000000AA 8B750C                  	mov esi, DWORD [ebp+12] ; esi - is int radius
+   129                                  	
+   130                                  	;body
+   131 000000AD 31D2                    	xor edx, edx 		; int x = 0, int y = radius => y = esi
+   132                                  
+   133 000000AF 89F0                    	mov eax, esi
+   134 000000B1 D1E0                    	shl eax, 1
+   135 000000B3 F7D0                    	not eax
+   136 000000B5 89C1                    	mov ecx, eax
+   137 000000B7 83C105                  	add ecx, 5
+   138 000000BA C1E102                  	shl ecx, 2
+   139 000000BD 51                      	push ecx		;push dltA on stack on the address ebp-4
+   140                                  
+   141 000000BE D1E0                    	shl eax, 1
+   142 000000C0 83C005                  	add eax, 5
+   143 000000C3 50                      	push eax		;push d on stack on the address ebp-8
+   144                                  
+   145 000000C4 B80C000000              	mov eax, 12
+   146 000000C9 50                      	push eax		;push dltB on stack on the address ebp-12
+   147                                  While:
+   148 000000CA 8B7D08                  	mov edi, DWORD[ebp+8]
+   149 000000CD 8B470C                  	mov eax, DWORD[edi+12]	;cX
+   150 000000D0 8B4F10                  	mov ecx, DWORD[edi+16]	;cY
+   151                                  
+   152 000000D3 52                      	push edx
+   153 000000D4 56                      	push esi 		;to preserve acros jmps --- might be used for all SetPixel calls!
+   154                                  
+   155 000000D5 89C7                    	mov edi, eax
+   156 000000D7 29D7                    	sub edi, edx 		;should be passed eax
+   157 000000D9 89FA                    	mov edx, edi
+   158                                  
+   159 000000DB 89CF                    	mov edi, ecx
+   160 000000DD 29F7                    	sub edi, esi		;should be passed ecx
+   161 000000DF 89FE                    	mov esi, edi
+   162                                  
+   163                                  	;esi is passed y; edx is passed x
+   164 000000E1 E86AFFFFFF              	call SetPixel
+   165                                  	;--------------------------------
+   166 000000E6 8B7D08                  	mov edi, DWORD[ebp+8]
+   167 000000E9 8B470C                  	mov eax, DWORD[edi+12]	;cX
+   168 000000EC 8B4F10                  	mov ecx, DWORD[edi+16]	;cY
+   169                                  
+   170 000000EF 8B55EC                  	mov edx, DWORD[ebp-20]
+   171 000000F2 8B75F0                  	mov esi, DWORD[ebp-16]
+   172                                  
+   173 000000F5 89C7                    	mov edi, eax
+   174 000000F7 29D7                    	sub edi, edx 		
+   175 000000F9 89FA                    	mov edx, edi
+   176                                  
+   177 000000FB 89CF                    	mov edi, ecx
+   178 000000FD 29F7                    	sub edi, esi		
+   179 000000FF 89FE                    	mov esi, edi
+   180                                  
+   181                                  	;esi is passed y; edx is passed x
+   182 00000101 E84AFFFFFF              	call SetPixel
+   183                                  	;--------------------------------
+   184                                  	;--------------------------------
+   185 00000106 8B7D08                  	mov edi, DWORD[ebp+8]
+   186 00000109 8B470C                  	mov eax, DWORD[edi+12]	;cX
+   187 0000010C 8B4F10                  	mov ecx, DWORD[edi+16]	;cY
+   188                                  
+   189 0000010F 8B55F0                  	mov edx, DWORD[ebp-16]
+   190 00000112 8B75EC                  	mov esi, DWORD[ebp-20]
+   191                                  
+   192 00000115 89C7                    	mov edi, eax
+   193 00000117 01D7                    	add edi, edx 		
+   194 00000119 89FA                    	mov edx, edi
+   195                                  
+   196 0000011B 89CF                    	mov edi, ecx
+   197 0000011D 29F7                    	sub edi, esi		
+   198 0000011F 89FE                    	mov esi, edi
+   199                                  
+   200                                  	;esi is passed y; edx is passed x
+   201 00000121 E82AFFFFFF              	call SetPixel
+   202                                  	;--------------------------------
+   203                                  	;--------------------------------
+   204 00000126 8B7D08                  	mov edi, DWORD[ebp+8]
+   205 00000129 8B470C                  	mov eax, DWORD[edi+12]	;cX
+   206 0000012C 8B4F10                  	mov ecx, DWORD[edi+16]	;cY
+   207                                  
+   208 0000012F 8B55EC                  	mov edx, DWORD[ebp-20]
+   209 00000132 8B75F0                  	mov esi, DWORD[ebp-16]
+   210                                  
+   211 00000135 89C7                    	mov edi, eax
+   212 00000137 01D7                    	add edi, edx 		
+   213 00000139 89FA                    	mov edx, edi
+   214                                  
+   215 0000013B 89CF                    	mov edi, ecx
+   216 0000013D 29F7                    	sub edi, esi		
+   217 0000013F 89FE                    	mov esi, edi
+   218                                  
+   219                                  	;esi is passed y; edx is passed x
+   220 00000141 E80AFFFFFF              	call SetPixel
+   221                                  	;--------------------------------
+   222                                  	;--------------------------------
+   223 00000146 8B7D08                  	mov edi, DWORD[ebp+8]
+   224 00000149 8B470C                  	mov eax, DWORD[edi+12]	;cX
+   225 0000014C 8B4F10                  	mov ecx, DWORD[edi+16]	;cY
+   226                                  
+   227 0000014F 8B55F0                  	mov edx, DWORD[ebp-16]
+   228 00000152 8B75EC                  	mov esi, DWORD[ebp-20]
+   229                                  
+   230 00000155 89C7                    	mov edi, eax
+   231 00000157 29D7                    	sub edi, edx 		
+   232 00000159 89FA                    	mov edx, edi
+   233                                  
+   234 0000015B 89CF                    	mov edi, ecx
+   235 0000015D 01F7                    	add edi, esi		
+   236 0000015F 89FE                    	mov esi, edi
+   237                                  
+   238                                  	;esi is passed y; edx is passed x
+   239 00000161 E8EAFEFFFF              	call SetPixel
+   240                                  	;--------------------------------
+   241                                  	;--------------------------------
+   242 00000166 8B7D08                  	mov edi, DWORD[ebp+8]
+   243 00000169 8B470C                  	mov eax, DWORD[edi+12]	;cX
+   244 0000016C 8B4F10                  	mov ecx, DWORD[edi+16]	;cY
+   245                                  
+   246 0000016F 8B55EC                  	mov edx, DWORD[ebp-20]
+   247 00000172 8B75F0                  	mov esi, DWORD[ebp-16]
+   248                                  
+   249 00000175 89C7                    	mov edi, eax
+   250 00000177 29D7                    	sub edi, edx 		
+   251 00000179 89FA                    	mov edx, edi
+   252                                  
+   253 0000017B 89CF                    	mov edi, ecx
+   254 0000017D 01F7                    	add edi, esi		
+   255 0000017F 89FE                    	mov esi, edi
+   256                                  
+   257                                  	;esi is passed y; edx is passed x
+   258 00000181 E8CAFEFFFF              	call SetPixel
+   259                                  	;--------------------------------
+   260                                  	;--------------------------------
+   261 00000186 8B7D08                  	mov edi, DWORD[ebp+8]
+   262 00000189 8B470C                  	mov eax, DWORD[edi+12]	;cX
+   263 0000018C 8B4F10                  	mov ecx, DWORD[edi+16]	;cY
+   264                                  
+   265 0000018F 8B55F0                  	mov edx, DWORD[ebp-16]
+   266 00000192 8B75EC                  	mov esi, DWORD[ebp-20]
+   267                                  
+   268 00000195 89C7                    	mov edi, eax
+   269 00000197 01D7                    	add edi, edx 		
+   270 00000199 89FA                    	mov edx, edi
+   271                                  
+   272 0000019B 89CF                    	mov edi, ecx
+   273 0000019D 01F7                    	add edi, esi		
+   274 0000019F 89FE                    	mov esi, edi
+   275                                  
+   276                                  	;esi is passed y; edx is passed x
+   277 000001A1 E8AAFEFFFF              	call SetPixel
+   278                                  	;--------------------------------
+   279                                  	;--------------------------------
+   280 000001A6 8B7D08                  	mov edi, DWORD[ebp+8]
+   281 000001A9 8B470C                  	mov eax, DWORD[edi+12]	;cX
+   282 000001AC 8B4F10                  	mov ecx, DWORD[edi+16]	;cY
+   283                                  
+   284 000001AF 8B55EC                  	mov edx, DWORD[ebp-20]
+   285 000001B2 8B75F0                  	mov esi, DWORD[ebp-16]
+   286                                  
+   287 000001B5 89C7                    	mov edi, eax
+   288 000001B7 01D7                    	add edi, edx 		
+   289 000001B9 89FA                    	mov edx, edi
+   290                                  
+   291 000001BB 89CF                    	mov edi, ecx
+   292 000001BD 01F7                    	add edi, esi		
+   293 000001BF 89FE                    	mov esi, edi
+   294                                  
+   295                                  	;esi is passed y; edx is passed x
+   296 000001C1 E88AFEFFFF              	call SetPixel
+   297                                  	;--------------------------------
+   298                                  	
+   299 000001C6 5E                      	pop esi			;reading the x and y
+   300 000001C7 5A                      	pop edx
+   301                                  
+   302 000001C8 8B45F8                  	mov eax, DWORD[ebp-8]	;d
+   303 000001CB 83F800                  	cmp eax, 0
+   304 000001CE 7E1B                    	jle Else
+   305                                  
+   306 000001D0 8B4DFC                  	mov ecx, DWORD[ebp-4] 	;dltA
+   307 000001D3 01C8                    	add eax, ecx
+   308 000001D5 8945F8                  	mov DWORD[ebp-8], eax 	;d += dltA
+   309 000001D8 4E                      	dec esi
+   310 000001D9 42                      	inc edx
+   311 000001DA 83C110                  	add ecx, 16 		;dltA += 4*4;
+   312 000001DD 894DFC                  	mov DWORD[ebp-4], ecx
+   313 000001E0 8B4DF4                  	mov ecx, DWORD[ebp-12]	;dltB
+   314 000001E3 83C108                  	add ecx, 8		;dltB += 2*4;
+   315 000001E6 894DF4                  	mov DWORD[ebp-12], ecx
+   316 000001E9 EB18                    	jmp Ending
+   317                                  
+   318                                  Else:
+   319 000001EB 8B4DF4                  	mov ecx, DWORD[ebp-12]	;dltB
+   320 000001EE 01C8                    	add eax, ecx
+   321 000001F0 8945F8                  	mov DWORD[ebp-8], eax 	;d += dltB
+   322 000001F3 42                      	inc edx
+   323 000001F4 8B45FC                  	mov eax, DWORD[ebp-4]
+   324 000001F7 83C008                  	add eax, 8		;dltA += 2*4;
+   325 000001FA 8945FC                  	mov DWORD[ebp-4], eax
+   326 000001FD 83C108                  	add ecx, 8		;dltB += 2*4;
+   327 00000200 894DF4                  	mov DWORD[ebp-12], ecx
+   328                                  	
+   329                                  Ending:
+   330 00000203 39F2                    	cmp edx, esi
+   331 00000205 0F8EBFFEFFFF            	jle While
+   332 0000020B 8B4508                  	mov eax, DWORD[ebp+8]
+   333 0000020E 5F                      	pop edi			;just to clean the stack
+   334 0000020F 5F                      	pop edi
+   335 00000210 5F                      	pop edi
+   336 00000211 5D                      	pop ebp
+   337 00000212 C3                      	ret
