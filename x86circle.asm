@@ -1,18 +1,16 @@
 global MoveTo
 global SetColor
 global DrawCircle
-;extern SetPixel
 
 section .text
 
 ;As i tried to stick to the convention in the 32 bit, hence the switching to the 64 mode was quite easy
+;Again I decided to make a SetPixel function as a private one, however, it doesn't change anything, as I stick to
+;the convention when getting function arguments. If you would like I could make it public, as it wouldn't really make a difference.
 
-;It was decided to made the SetPixel a "private" function due to minimize the number of calls to the memory stack.
-;The major advantage of this solution over the prior solution is exactly 6 * 8 = 48 calls to the stack less with
-;each iteration only in the DrawCircle function! Assuming that the number of calls in the SetPixel was greater then
-;it is now (as there were 3 parameters read, and there was saving of the *pPix, and pop of the rbp, hence it is
-;assumed that all numbers of calls to the stack had to be greater then 10), however, it might all depend on the
-;optimization level on the compiler, I might be wrong.
+;What can be seen is that now I don't push anything on stack (only rbp), moreover, there are significantly less operations on the main memory. Thanks to grater number of registers it wasn't difficult to deal with greater number of variables
+
+;Here everywhere the rdi is preserved. The byte access to image was used as well as the byte mask preparation.
 
 ;The previous solution can be seen in the commits on my github account:
 ;https://github.com/bartoszlomiej/DrawCircle	
@@ -22,7 +20,6 @@ MoveTo:
 	;prologue
 	push rbp
 	mov rbp, rsp
-
 	;due to gdb: edx stores 0x100 (y), esi 0x100(x), rdi *pImg
 	
 	;body
@@ -75,8 +72,6 @@ ChangeColor:
 ;void SetPixel(imgInfo* pImg, int x, int y){
 SetPixel:
 ;	push ebp
-;	mov ebp, esp
-	;mov rdi, QWORD[rbp+16]
 	;rdi is imgInfo*pImg
 	;rsi is int x
 	;rdx is int y
@@ -104,24 +99,21 @@ SetPixel:
 
 	;unsigned char mask = 0x80 >> (x & 0x07);
 	mov rcx, rsi
-	mov r15, 0x80
-	and rcx, 0x07
-	shr r15, cl		;shr needs either imidiate or cl register, which is actually a part of rcx
-	mov rcx, r15		;just for the comfortable usage
-	
-;	mov rdi, QWORD[rbp+16]
+	mov r15b, 0x80
+	and cl, 0x07
+	shr r15b, cl		;shr needs either imidiate or cl register, which is actually a part of rcx
+	mov cl, r15b		;just for the comfortable usage
 
 	cmp DWORD[rdi+24], 1
 	jne BlackPixel
-	or ecx, DWORD[rax]
-;	or ecx, DWORD[eax]	;*pPix |= mask;
-	mov DWORD[rax], ecx
+	or cl, BYTE[rax]
+	mov BYTE[rax], cl
 	jmp ReturnVoid
 	
 BlackPixel:
-	not ecx			;*pPix &= ~mask;
-	and ecx, DWORD[rax]		;DWORD[eax]
-	mov DWORD[rax], ecx
+	not cl			;*pPix &= ~mask;
+	and cl, BYTE[rax]		;DWORD[eax]
+	mov BYTE[rax], cl
 
 ReturnVoid:
 	xor rax, rax		;return void - in this case return 0 
@@ -131,16 +123,15 @@ ReturnVoid:
 DrawCircle:
 	;prologue
 	push rbp
-	;	mov rbp, rsp	
-	;	mov rdi, QWORD [rbp+16] 	;rdi - is the address of *pImg
-	;	mov rsi, QWORD [rbp+24] ; rsi - is int radius
 	
 	;due to gdb: rsi radius, rdi *pImg
 	;body
-	xor rdx, rdx 		; int x = 0, int y = radius => y = rsi
-
+	xor rdx, rdx 	; int x = 0, int y = radius => y = rsi
+	
 	mov r13, rdx ;to preserve acros jmps --- might be used for all SetPixel calls!
-	mov r14, rsi
+	mov r14, rsi ;further the rsi will be x, rdx will be y due to convantion of function calling
+	mov r11d, DWORD[rdi+16]	;cX
+	mov r12d, DWORD[rdi+20]	;cY
 	
 	mov rax, rsi
 	shl rax, 1
@@ -149,102 +140,130 @@ DrawCircle:
 	add rcx, 5
 	shl rcx, 2
 	mov r8, rcx
-;	push rcx		;dltA is r8
 
 	shl rax, 1
 	add rax, 5
 	mov r9, rax
-;	push rax		;d is r9
 
 	mov rax, 12
 	mov r10, rax
-	;	push rax		;dltB is r10
-	mov r11, QWORD[rdi+16]	;cX
-	mov r12, QWORD[rdi+20]	;cY
 While:
-;	mov rdi, QWORD[rbp+16]
-
-
-;	push rdx
-	;	push rsi 		;to preserve acros jmps --- might be used for all SetPixel calls!
-
-	;mov rdi, rax
 	mov rax, r13
-	mov rsi, r11
+	mov rsi, r12
 	sub rsi, rax 		
 
 	mov rcx, r14
-	mov rdx, r12
+	mov rdx, r11
 	sub rdx, rcx		
 
 	;rsi is passed y; rdx is passed x
 	;now rsi is x; rdx is y - due to convention
 	call SetPixel
 	;--------------------------------
-;	mov rdi, QWORD[rbp+16]
-;	mov rax, QWORD[rdi+24]	;cX
-	;	mov rcx, QWORD[rdi+32]	;cY
-	
-;	mov rdx, QWORD[rbp-40]
-;	mov rsi, QWORD[rbp-32]
-	;rdx is y
-	;rsi is x
-;	mov rsi, r11
-;	mov rdx, r12
-	
-;	mov rdi, rax
-
 	mov rax, r14
 	mov rsi, r12
 	sub rsi, rax 		;should be passed rax
-;	mov rsi, rax
 
 	mov rcx, r13
 	mov rdx, r11
 	sub rdx, rcx		;should be passed rcx
-;	mov rdx, rcx
 
 	;rsi is passed y; rdx is passed x
 	call SetPixel
 	;--------------------------------
-	;--------------------------------
-	
-;	pop rsi			;reading the x and y
-;	pop rdx
 
-;	mov rax, QWORD[rbp-16]	;d
+	mov rax, r14
+	mov rsi, r12
+	add rsi, rax 		;should be passed rax
+
+	mov rcx, r13
+	mov rdx, r11
+	sub rdx, rcx		;should be passed rcx
+
+	;rsi is passed y; rdx is passed x
+	call SetPixel
+	
+	;--------------------------------
+
+	mov rax, r13
+	mov rsi, r12
+	add rsi, rax 		;should be passed rax
+
+	mov rcx, r14
+	mov rdx, r11
+	sub rdx, rcx		;should be passed rcx
+
+	;rsi is passed y; rdx is passed x
+	call SetPixel
+	
+	;--------------------------------
+	mov rax, r13
+	mov rsi, r12
+	sub rsi, rax 		;should be passed rax
+
+	mov rcx, r14
+	mov rdx, r11
+	add rdx, rcx		;should be passed rcx
+
+	;rsi is passed y; rdx is passed x
+	call SetPixel
+	
+	;--------------------------------
+	mov rax, r14
+	mov rsi, r12
+	sub rsi, rax 		;should be passed rax
+
+	mov rcx, r13
+	mov rdx, r11
+	add rdx, rcx		;should be passed rcx
+
+	;rsi is passed y; rdx is passed x
+	call SetPixel
+	
+	;--------------------------------
+	mov rax, r14
+	mov rsi, r12
+	add rsi, rax 		;should be passed rax
+
+	mov rcx, r13
+	mov rdx, r11
+	add rdx, rcx		;should be passed rcx
+
+	;rsi is passed y; rdx is passed x
+	call SetPixel
+	
+	;--------------------------------
+	mov rax, r13
+	mov rsi, r12
+	add rsi, rax 		;should be passed rax
+
+	mov rcx, r14
+	mov rdx, r11
+	add rdx, rcx		;should be passed rcx
+
+	;rsi is passed y; rdx is passed x
+	call SetPixel
+	
+	;--------------------------------	
 	cmp r9, 0
 	jle Else
 
-;	mov rcx, QWORD[rbp-8] 	;dltA
-	add r9, r8
-;	mov QWORD[rbp-16], rax 	;d += dltA
+	add r9, r8		;d += dltA
 	dec r14
 	inc r13
 	add r8, 16 		;dltA += 4*4;
-;	mov QWORD[rbp-8], rcx
-;	mov rcx, QWORD[rbp-24]	;dltB
 	add r10, 8		;dltB += 2*4;
-;	mov QWORD[rbp-24], rcx
 	jmp Ending
 
 Else:
-;	mov rcx, QWORD[rbp-24]	;dltB
-	add r9, r10
-;	mov QWORD[rbp-16], rax 	;d += dltB
+	add r9, r10		;d += dltB
 	inc r13
-;	mov rax, QWORD[rbp-8]
 	add r8, 8		;dltA += 2*4;
-;	mov QWORD[rbp-8], rax
 	add r10, 8		;dltB += 2*4;
-;	mov QWORD[rbp-24], rcx
 	
 Ending:
 	cmp r13, r14
 	jle While
 	mov rax, rdi		;QWORD[rbp+8]
-;	pop rdi			;just to clean the stack
-;	pop rdi
-;	pop rdi
 	pop rbp
 	ret

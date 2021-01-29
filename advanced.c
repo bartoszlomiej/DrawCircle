@@ -151,59 +151,7 @@ int saveBMP(const imgInfo* pInfo, const char* fname)
 	return 0;
 }
 
-void SetPixel(imgInfo* pImg, int x, int y)
-{
-	unsigned char *pPix = pImg->pImg + (((pImg->width + 31) >> 5) << 2) * y + (x >> 3);
-	unsigned char mask = 0x80 >> (x & 0x07);
 
-	if (x < 0 || x >= pImg->width || y < 0 || y >= pImg->height)
-		return;
-
-	if (pImg->col)
-		*pPix |= mask;
-	else
-		*pPix &= ~mask;
-}
-
-/*
-imgInfo* DrawCircle(imgInfo* pImg, int radius)
-{
-	// draws circle with center in currnet position and given radius
-	int cx = pImg->cX, cy = pImg->cY;
-	int d = 5 - 4 * radius, x = 0, y = radius;
-	int dltA = (-2*radius+5)*4;
-	int dltB = 3*4;
-
-	while (x <= y)
-	{
-		// 8 symmetric pixels
-		SetPixel(pImg, cx-x, cy-y);
-		SetPixel(pImg, cx-x, cy+y);
-		SetPixel(pImg, cx+x, cy-y);
-		SetPixel(pImg, cx+x, cy+y);
-		SetPixel(pImg, cx-y, cy-x);
-		SetPixel(pImg, cx-y, cy+x);
-		SetPixel(pImg, cx+y, cy-x);
-		SetPixel(pImg, cx+y, cy+x);
-		if (d > 0)
-		{
-			d += dltA;
-			y--;
-			x++;
-			dltA += 4*4;
-			dltB += 2*4;
-		}
-		else
-		{
-			d += dltB;
-			x++;
-			dltA += 2*4;
-			dltB += 2*4;
-		}
-	}
-	return pImg;
-}
-*/
 /****************************************************************************************/
 imgInfo* InitScreen (int w, int h)
 {
@@ -262,9 +210,6 @@ int main(int argc, char* argv[])
 
 	pInfo = readBMP("blank.bmp");
 	MoveTo(pInfo, 256, 256);
-	int a = 10;
-	printf("int: %d\n struct: %d\n", sizeof(a), sizeof(pInfo));
-	printf("Moved to: %d, %d", pInfo->cX, pInfo->cY);
 
 	for (i=3; i < 256; i+=3){
 	  SetColor(pInfo, i & 1);
